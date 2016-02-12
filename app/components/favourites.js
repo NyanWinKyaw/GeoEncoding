@@ -9,10 +9,14 @@ import React, {
   ScrollView,
   PropTypes,
   Image,
-  Button
+  Button,
+  Platform,
+  ToastAndroid
 } from 'react-native';
 // var _ = require('lodash');
 var RefreshableListView = require('react-native-refreshable-listview')
+var Icon = require('react-native-vector-icons/FontAwesome');
+import Toast from './toast.ios';
 
 import Database from '../database/database';
 
@@ -25,12 +29,18 @@ class Favourites extends Component {
     this.favDataSource = new ListView.DataSource( {
         rowHasChanged: (row1, row2) => row1 !== row2
     });
+
+    this.state = {toastText: '',isVisible: false};
+
+    // Early binding
+    this.renderFav = this.renderFav.bind(this)
+    this.hideToast = this.hideToast.bind(this)
   }
 
   componentDidMount() {
     Database.loadDB().then((db) => {
       //this.loadFavourites();
-      // console.log(Database);
+      // // console.log(Database);
         this.props.actions.fetchFavourites(Database);
     });
   }
@@ -38,65 +48,47 @@ class Favourites extends Component {
   loadFavourites() {
     var favs = Database.getFavourites();
     this.favDataSource.cloneWithRows(favs);
-      /*.then( (result) => {
-        // console.log(result)
-        dataSource: this.dataSource.cloneWithRows(result[0].rows);
-      } )
-      .done();*/
   }
 
-
-  onRowPressed(rowData){
-      //// console.log(this.props);
-      this.props.navActions.details({data:rowData});
+  onRemovePressed(addressID, i) {
+    let message = "Removed";
+    if(Platform.OS ==='ios') {
+        this.setState({toastText: message});
+        this.setState({isVisible: true});
+        setTimeout(this.hideToast, 800);
+    }
+    else {
+        ToastAndroid.show(message, ToastAndroid.SHORT);
+    }
+    this.props.actions.removeFavourite(Database, addressID, i, this.props.addresses._dataBlob.s1);
   }
 
-  onRemovePressed(addressID) {
-    Database.removeAddress(addressID)
-    .then(() => {
-      // console.log("DELETED.  LOADING FAVS");
-        this.props.actions.fetchFavourites(Database);
-    });
+  hideToast() {
+      if(this.props.routerState[0] == 'favourites'){
+          this.setState({isVisible: false});
+      }
   }
 
-  renderRow(rowData){
-    var address = rowData.formatted_address;
-    var imageURI = 'https://maps.googleapis.com/maps/api/streetview?size=800x800&location=' + rowData.geometry.location.lat + ',' + rowData.geometry.location.lng;
+  renderFav(rowData, i, j) {
     return(
-      <TouchableHighlight onPress={this.onRowPressed.bind(this, rowData)}
-          underlayColor='#dddddd'>
-          <View>
-                <View style={styles.row}>
-                    <Text style={styles.address}>{address}</Text>
-                    <Image style = {styles.thumb} source = {{uri: imageURI}}/>
-                    <Text style={styles.button}
-                            onPress={this.onFavPressed.bind(this, address)}>
-                            Add to Favourites
+        <View>
+            <Toast isVisible = {this.state.isVisible} onDismiss = {this.hideTopToast} position = 'top'>
+                <View>
+                    <Text style = {styles.toastText}>{this.state.toastText}</Text>
+                </View>
+            </Toast>
+            <View style={styles.rowAddress}>
+                <View style={styles.addressWrap}>
+                    <Text style={styles.address}>
+                        {rowData.address}
                     </Text>
                 </View>
-                <View style={styles.separator}/>
-          </View>
-      </TouchableHighlight>
-    )
-  }
-
-  renderFav(rowData) {
-    return(
-      <TouchableHighlight onPress={this.onRowPressed.bind(this, rowData)}
-          underlayColor='#dddddd'>
-          <View>
-            <View>
-                <Text style={styles.address}>{rowData.id}: {rowData.address}</Text>
-
-                <Text style={styles.button}
-                        onPress={this.onRemovePressed.bind(this, rowData.id)}>
-                        Remove From Favourites
-                        </Text>
+                <TouchableHighlight onPress={this.onRemovePressed.bind(this, rowData.id, j)} underlayColor='#fff'>
+                    <Icon name = "times" size = {20} color = "rgba(200,0,0,1)" style = {styles.button} allowFontScaling={false}/>
+                </TouchableHighlight>
             </View>
             <View style={styles.separator}/>
-
-      </View>
-  </TouchableHighlight>
+        </View>
    );
   }
 
@@ -104,78 +96,53 @@ class Favourites extends Component {
   render() {
     const { favourites } = this.props;
     return (
-        <View style={styles.container}>
+        <ScrollView style={styles.container}>
           <View style={styles.listContainer}>
             <ListView
               dataSource={favourites}
-              renderRow={this.renderFav.bind(this)}
+              renderRow={this.renderFav}
               />
           </View>
-        </View>
+      </ScrollView>
     );
   }
 }
-// AddressList.propTypes = {
-//   searchString : PropTypes.string,
-//   addresses : PropTypes.object,
-//   actions : PropTypes.objectOf(PropTypes.func)
-// }
 
-  const styles = StyleSheet.create({
-    scrollView: {
-    height: 600,
-  },
-  container: {
-      marginTop:80,
-  },
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        marginTop: 70,
+        marginBottom: (Platform.OS ==='ios') ? 55 : 0,
+        marginTop: (Platform.OS ==='ios') ? 80 : 100
+    },
     listContainer: {
-      marginTop:10,
-      flexDirection:'row',
-      alignItems: 'center',
-      alignSelf:'stretch',
+        flexDirection:'row',
+        alignItems: 'center',
+        alignSelf:'stretch',
     },
-    searchInput: {
-      flex: 1,
-      height: 36,
-      padding: 4,
-      marginLeft : 10,
-      marginRight: 10,
-      fontSize: 18,
-      color: 'gray',
-      borderWidth: 1,
-      borderColor: 'gray',
-      borderRadius: 8,
-      backgroundColor: '#F5FCFF'
+    separator:{
+        height:1,
+        backgroundColor:'gray'
     },
-    button:{
-      margin : 5,
-      padding :5,
-      height: 30,
-      borderWidth: 1,
-      borderColor: '#48BBEC',
-      borderRadius: 8,
-      backgroundColor:'#48BBEC',
-      alignSelf:'stretch',
-      justifyContent:'center'
+    addressWrap: {
+        flex: 9
     },
-    buttonText:{
-      fontSize:18,
-      color:'white'
-    },
-    row:{
-      padding :10,
-      flexDirection: 'column'
-
-    },separator:{
-      height:1,
-      backgroundColor:'gray'
-  },
-  thumb: {
-        height: 100,
-        marginTop: 10
+    rowAddress:{
+        padding: 5,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 5,
+        marginBottom: 5,
     },
     address: {
-        fontSize: 14
-    }
-  });
+        fontSize: 14,
+    },
+    button: {
+        alignSelf: 'center',
+        width: 20,
+        height: 20,
+        flex: 1
+    },
+});
 module.exports = Favourites

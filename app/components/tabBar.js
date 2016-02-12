@@ -6,8 +6,11 @@ import Actions from '../actions/actionTypes';
 export default class TabBar extends React.Component {
     constructor(props){
 
-        // console.log("SHOWING TAB BAR");
+        // // console.log("SHOWING TAB BAR");
         super(props);
+
+        // Early binding
+        this.onSelect = this.onSelect.bind(this)
     }
     onSelect(el){
         if (!Actions[el.props.name]){
@@ -56,15 +59,15 @@ export default class TabBar extends React.Component {
     }
 
     componentWillReceiveProps({selected}){
-        //// console.log("TABBAR "+selected);
+        //// // console.log("TABBAR "+selected);
         InteractionManager.runAfterInteractions(() =>
             this.setState(this.getChildrenState(selected)));
     }
     render(){
 
-        // console.log("SHOWING TAB BAR");
+        // // console.log("SHOWING TAB BAR");
         return (
-            <Tabs style={[{backgroundColor:'white'}, this.props.tabBarStyle]} onSelect={this.onSelect.bind(this)} {...this.props}>
+            <Tabs style={[{backgroundColor:'white'}, this.props.tabBarStyle]} onSelect={this.onSelect} {...this.props}>
                 {this.state.children}
             </Tabs>
         );

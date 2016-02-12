@@ -1,5 +1,4 @@
 import { createStore, applyMiddleware,combineReducers, compose } from 'redux';
-import {routerReducer} from 'react-native-redux-router';
 import thunk from 'redux-thunk';
 import * as reducers from '../reducers';
 import globals from './globals';
@@ -13,12 +12,12 @@ export default function configureStore(initialState) {
     return (next) => (action) => {
 
       if(action){
-        // console.log('Middleware - will dispatch action :', action)
+        // // console.log('Middleware - will dispatch action :', action)
 
         // Call the next dispatch method in the middleware chain.
         let returnValue = next(action)
 
-        // console.log('Middleware - state after dispatch :', getState())
+        // // console.log('Middleware - state after dispatch :', getState())
 
         var replay = {action:action,next:next};
         globals.replayCache.push(replay);
@@ -31,7 +30,7 @@ export default function configureStore(initialState) {
   }
 
   const finalCreateStore = compose(
-    applyMiddleware(thunk, loggerMiddleWare)
+    applyMiddleware(thunk)
   )(createStore);
 
   const reducer = combineReducers(reducers);

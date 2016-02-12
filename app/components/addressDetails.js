@@ -12,7 +12,9 @@ var {
     Component,
     TouchableHighlight,
     PropTypes,
-    LinkingIOS
+    LinkingIOS,
+    Platform,
+    ScrollView
 } = React
 
 /*
@@ -24,13 +26,47 @@ const SPACE = 0.01;
 */
 
 class AddressDetails extends Component {
-  onTitlePress(){
-    // console.log("onTitlePress : "  + this.props.route);
-    this.props.routes.pop();
+
+  constructor(props) {
+    super(props);
+
+    this.state = {appleMaps: false, googleMaps: false};
+
+    // Early binding
+    this.onApplePressed = this.onApplePressed.bind(this)
+    this.onGooglePressed = this.onGooglePressed.bind(this)
+    this.componentWillMount = this.componentWillMount.bind(this)
   }
 
-  onDirectionPressed(){
+  componentWillMount() {
+      if(Platform.OS ==='ios') {
+          let apple = 'http://maps.apple.com/?q=Lynx+office';
+          let google = 'comgooglemaps://?daddr=Lynx+office';
+          LinkingIOS.canOpenURL(apple, (supported) => {
+              if(supported){
+                  this.setState({appleMaps: true});
+              } else {
+                  this.setState({appleMaps: false});
+              }
+          });
+
+          LinkingIOS.canOpenURL(google, (supported) => {
+              if(supported){
+                  this.setState({googleMaps: true});
+              } else {
+                  this.setState({googleMaps: false});
+              }
+          });
+      }
+  }
+
+  onApplePressed(){
       var url = 'http://maps.apple.com/?daddr=' + this.props.data.geometry.location.lat + ',' + this.props.data.geometry.location.lng + '&dirflg=d';
+      LinkingIOS.openURL(url);
+  }
+
+  onGooglePressed(){
+      var url = 'comgooglemaps://?daddr=' + this.props.data.geometry.location.lat + ',' + this.props.data.geometry.location.lng;
       LinkingIOS.openURL(url);
   }
 
@@ -55,31 +91,46 @@ class AddressDetails extends Component {
         longitude: lng,
     };
 
+    var appleButton = this.state.appleMaps ?
+    (<TouchableHighlight style = {styles.button}
+               underlayColor = '#ffc266'
+               onPress = {this.onApplePressed}>
+               <Text style = {styles.buttonText}>Apple</Text>
+     </TouchableHighlight>):
+    ( <View/> );
+
+    var googleButton = this.state.googleMaps ?
+    (<TouchableHighlight style = {styles.button}
+               underlayColor = '#ffc266'
+               onPress = {this.onGooglePressed}>
+               <Text style = {styles.buttonText}>Google</Text>
+     </TouchableHighlight>):
+    ( <View/> );
+
     return (
-     <View style={styles.container}>
-       <View style={styles.heading}>
-         <Text style={styles.title} onPress={this.onTitlePress.bind(this)}>{title}</Text>
-         <View style={styles.separator}></View>
-       </View>
-       <Text style={styles.description}>{latLong}</Text>
+        <ScrollView style={styles.container}>
+            <View style={styles.heading}>
+                <Text style={styles.title}>{title}</Text>
+                <View style={styles.separator}></View>
+            </View>
+            <Text style={styles.description}>{latLong}</Text>
 
-         <MapView
-           ref="map"
-           style={styles.map}
-           initialRegion={region}
-         >
-           <MapView.Marker
-               coordinate = {latlng}
-               title = {title}/>
-         </MapView>
+            <MapView
+                ref="map"
+                style={styles.map}
+                initialRegion={region}
+            >
+            <MapView.Marker
+                coordinate = {latlng}
+                title = {title}/>
+            </MapView>
 
-         <TouchableHighlight style = {styles.button}
-                    underlayColor = '#99d9f4'
-                    onPress = {this.onDirectionPressed.bind(this)}>
-                    <Text style = {styles.buttonText}>Direction</Text>
-          </TouchableHighlight>
+            <View style = {styles.buttonContainer}>
+                {appleButton}
+                {googleButton}
+            </View>
 
-     </View>
+        </ScrollView>
    );
 
    }
@@ -93,8 +144,8 @@ AddressDetails.propTypes = {
 var styles = StyleSheet.create({
   container: {
     flex:1,
-    marginTop: 80
-    // flexDirection:'column'
+    marginTop: (Platform.OS ==='ios') ? 80 : 120,
+    marginBottom: (Platform.OS ==='ios') ? 55 : 0
   },
   heading: {
   },
@@ -104,12 +155,19 @@ var styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    margin: 10,
+    marginLeft: 10,
+    marginRight: 10,
     color: '#656565'
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    marginBottom: 10
   },
   description: {
     fontSize: 16,
-    margin: 10,
+    marginLeft: 10,
+    marginRight: 10,
+    marginBottom: 10,
     color: '#656565'
   },
   map: {
@@ -128,9 +186,8 @@ var styles = StyleSheet.create({
  button: {
     height: 36,
     flexDirection: 'row',
-    backgroundColor: '#48BBEC',
-    borderColor: '48BBEC',
-    borderWidth: 1,
+    flex: 1,
+    backgroundColor: '#ff9900',
     borderRadius: 8,
     marginLeft: 10,
     marginRight: 10,

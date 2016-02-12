@@ -1,13 +1,13 @@
 import React, {
   StyleSheet,
   Component,
-  ScrollView,
   Text,
   TextInput,
   TouchableHighlight,
   ListView,
   PropTypes,
   Image,
+  ScrollView,
   AsyncStorage,
   TouchableOpacity,
   ToastAndroid,
@@ -18,13 +18,14 @@ var RefreshableListView = require('react-native-refreshable-listview');
 var { createAnimatableComponent, View } = require('react-native-animatable');
 var Spinner = require('react-native-spinkit');
 var Overlay = require('react-native-overlay');
+var IonIcon = require('react-native-vector-icons/Ionicons');
 import Toast from './toast.ios';
 const STORAGE_KEY = '@GeoEncoding:address'
-
 
 import Database from '../database/database';
 
 import globals from '../store/globals';
+import * as assets from '../../assets';
 
 class AddressList extends Component {
 
@@ -33,7 +34,15 @@ class AddressList extends Component {
     Database.loadDB();
 
     // Local state to show/hide Toast box
-    this.state = {isVisible: false};
+    this.state = {toastText: '',isVisible: false};
+
+    // Early binding
+    this.onSearchTextChanged = this.onSearchTextChanged.bind(this)
+    this.hideToast = this.hideToast.bind(this)
+    this.onRowPressed = this.onRowPressed.bind(this)
+    this.onFavPressed = this.onFavPressed.bind(this)
+    this.renderRow = this.renderRow.bind(this)
+    this.updateList = this.updateList.bind(this)
   }
 
   componentDidMount() {
@@ -45,13 +54,20 @@ class AddressList extends Component {
       try {
           let value = await AsyncStorage.getItem(STORAGE_KEY);
           this.props.actions.changeSearchText(value);
+
+          let rowCount = this.props.addresses.getRowCount()
+          if(!this.props.isEmpty && this.props.searchString !== null && rowCount === 0){
+            this.debouncedFetch(this.props.searchString, Database);
+          }
       } catch(error) {
-          // console.log(error);
+          // // console.log(error);
       }
   }
 
-  hideTopToast() {
-      this.setState({isVisible: false});
+  hideToast() {
+      if(this.props.routerState[0] == 'launch'){
+          this.setState({isVisible: false});
+      }
   }
 
   onSearchTextChanged(event){
@@ -62,13 +78,14 @@ class AddressList extends Component {
     try {
         AsyncStorage.setItem(STORAGE_KEY, event.nativeEvent.text);
     } catch (error){
-        // console.log(error.message);
+        // // console.log(error.message);
     }
+
+    // // console.log(this);
 
     // Call debounced function
     event.persist()
-    var address = this.props.searchString;
-    this.debouncedFetch(address, Database);
+    this.updateList();
   }
 
   updateList(){
@@ -95,39 +112,42 @@ class AddressList extends Component {
   }
 
   onRowPressed(rowData){
-      //// console.log(this.props);
+      // console.log(this.props);
       this.props.navActions.details({data:rowData});
   }
 
-  onFavPressed(rowData) {
+  onFavPressed(rowData, i, isFav) {
+      var message = 'placeholder';
+      if(isFav) {
+          message = "Removed";
+      } else {
+          message = "Added";
+      }
+
       if(Platform.OS ==='ios') {
+          this.setState({toastText: message});
           this.setState({isVisible: true});
-          setTimeout(this.hideTopToast.bind(this), 2000);
+          setTimeout(this.hideToast, 800);
       }
       else {
-          ToastAndroid.show('Added to favourites', ToastAndroid.SHORT);
+          ToastAndroid.show(message, ToastAndroid.SHORT);
       }
-      Database.insertAddress(rowData.formatted_address).then(() => {
 
-      });
-
-      //rowData.isFav = true;
+      if(isFav) {
+          this.props.actions.unFavourite(Database, rowData.formatted_address, i);
+      } else {
+          this.props.actions.insertFavourites(Database, rowData.formatted_address, i);
+      }
 
   }
 
 
-  onRemovePressed(rowData) {
-      Database.removeFavourite(rowData.formatted_address)
-      .then(() => {
-        console.log("DELETED.  LOADING FAVS");
-
-      });
-    }
-
-
-  renderRow(rowData, i){
+  renderRow(rowData, i, j){
     var address = rowData.formatted_address;
     var imageURI = 'https://maps.googleapis.com/maps/api/streetview?size=800x800&location=' + rowData.geometry.location.lat + ',' + rowData.geometry.location.lng;
+    var favIcon = rowData.isFav ?
+    (<IonIcon name = "ios-star" size = {28} color = "ffde00" style = {styles.fav} allowFontScaling={false}/>):
+    (<IonIcon name = "ios-star-outline" size = {28} color = "ff9900" style = {styles.fav} allowFontScaling={false}/>);
     return(
       <TouchableHighlight onPress={this.onRowPressed.bind(this, rowData)}
           underlayColor='#dddddd'>
@@ -136,10 +156,10 @@ class AddressList extends Component {
                     <View style={styles.rowAddress}>
                         <Text style={styles.address}>{address}</Text>
 
-                        <TouchableHighlight onPress={(rowData.isFav) ?  this.onRemovePressed.bind(this, rowData) : this.onFavPressed.bind(this, rowData)} underlayColor='#fff'>
-                            <Image style={styles.fav}
-                            source= {(rowData.isFav) ? require('../../assets/ic_stat_fav.png') : require('../../assets/ic_stat_notfav.png')}
-                            />
+
+                        <TouchableHighlight style = {styles.favTouchable}  onPress={(rowData.isFav) ?  this.onFavPressed.bind(this, rowData, j, true) : this.onFavPressed.bind(this, rowData, j, false)} underlayColor='#fff'>
+
+                            {favIcon}
                         </TouchableHighlight>
                     </View>
                     <Image style = {styles.thumb}
@@ -155,10 +175,10 @@ class AddressList extends Component {
 
   renderFav(rowData) {
     return(
-    <View>
-        <Text style={styles.address}>{rowData.address}</Text>
-    </View>
-   );
+        <View>
+            <Text style={styles.address}>{rowData.address}</Text>
+        </View>
+    );
   }
 
   render() {
@@ -168,12 +188,12 @@ class AddressList extends Component {
     (<ScrollView style={styles.listContainer}>
                 <RefreshableListView
                     dataSource={addresses}
-                    renderRow={this.renderRow.bind(this)}
-                    loadData={this.updateList.bind(this)}
+                    renderRow={this.renderRow}
+                    loadData={this.updateList}
                     refreshDescription="Refreshing articles"
                     automaticallyAdjustContentInsets = {false}
                 />
-            </ScrollView>):
+        </ScrollView>):
     ( <View/> );
 
     var empty = !this.props.isLoading && this.props.isEmpty ?
@@ -184,36 +204,39 @@ class AddressList extends Component {
 
     if(Platform.OS ==='ios') {
         var spinner = this.props.isLoading ?
-        ( <Spinner
-            style = {styles.spinner}
+        ( <View style = {styles.spinner}>
+            <Spinner
             isVisible = {true}
             size = {50}
             type = 'Pulse'
-            color = '#4da6ff' />):
+            color = '#ffbb99' />
+          </View>):
         ( <View/> );
     } else {
         var spinner = this.props.isLoading ?
-        ( <Spinner
+        ( <View style = {styles.spinner}>
+            <Spinner
             style = {styles.spinner}
             isVisible = {true}
             size = {50}
             type = 'ThreeBounce'
-            color = '#4da6ff' />):
+            color = '#ffbb99' />
+          </View>):
         ( <View/> );
     }
-    console.log(this.props.isEmpty);
+    //// console.log(this.props.isEmpty);
     return (
         <View style={styles.pageContainer}>
-            <Toast isVisible = {this.state.isVisible} onDismiss = {this.hideTopToast.bind(this)} position = 'top'>
+            <Toast isVisible = {this.state.isVisible} onDismiss = {this.hideToast} position = 'top'>
                 <View>
-                    <Text style = {styles.toastText}>Added to favourites</Text>
+                    <Text style = {styles.toastText} allowFontScaling={false}>{this.state.toastText}</Text>
                 </View>
             </Toast>
             <View style={styles.inputContainer}>
                 <TextInput
                     style={styles.searchInput}
                     value= {searchString}
-                    onChange={this.onSearchTextChanged.bind(this)}
+                    onChange={this.onSearchTextChanged}
                     placeholder="Search location"/>
             </View>
             {spinner}
@@ -223,19 +246,15 @@ class AddressList extends Component {
     );
   }
 }
-// AddressList.propTypes = {
-//   searchString : PropTypes.string,
-//   addresses : PropTypes.object,
-//   actions : PropTypes.objectOf(PropTypes.func)
-// }
 
-  const styles = StyleSheet.create({
+const styles = StyleSheet.create({
     pageContainer: {
         flex: 1,
         flexDirection: 'column'
     },
     inputContainer: {
-      marginTop:80,
+      // marginTop:80,
+      marginTop: (Platform.OS ==='ios') ? 80 : 120,
       flexDirection:'row',
       alignItems: 'center',
       alignSelf:'stretch'
@@ -254,7 +273,7 @@ class AddressList extends Component {
       flex:1,
       marginTop:20,
       flexDirection:'column',
-      marginBottom:50
+      marginBottom: (Platform.OS ==='ios') ? 55 : 0,
     },
     emptyContainer: {
       flex: 1,
@@ -273,7 +292,7 @@ class AddressList extends Component {
       borderWidth: 1,
       borderColor: 'gray',
       borderRadius: 8,
-      backgroundColor: '#F5FCFF'
+      backgroundColor: '#fff5e6'
     },
     button:{
       padding :5,
@@ -294,8 +313,8 @@ class AddressList extends Component {
     },separator:{
       height:1,
       backgroundColor:'gray'
-  },
-  thumb: {
+    },
+    thumb: {
         height: 100,
         marginTop: 10
     },
@@ -307,16 +326,19 @@ class AddressList extends Component {
     },
     address: {
         fontSize: 14,
-        alignSelf: 'center'
+        flex: 9
+    },
+    favTouchable: {
+        flex: 1
     },
     fav: {
       alignSelf: 'center',
       width: 25,
       height: 25
-  },
-  noResultText: {
+    },
+    noResultText: {
       fontSize: 24,
       color: 'gray'
   }
-  });
+});
 module.exports = AddressList

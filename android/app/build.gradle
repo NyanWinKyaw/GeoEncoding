@@ -57,16 +57,27 @@ android {
         applicationId "com.geoencoding"
         minSdkVersion 16
         targetSdkVersion 22
-        versionCode 1
-        versionName "1.0.0"
+        versionCode 3
+        versionName "1.0.3"
         ndk {
             abiFilters "armeabi-v7a", "x86"
+        }
+    }
+    signingConfigs {
+        release {
+            if(System.getenv("GEOENCODING_RELEASE_KEY_ALIAS") == "release-geo-alias"){
+              storeFile file(System.getenv("GEOENCODING_RELEASE_STORE_FILE"))
+              storePassword System.getenv("GEOENCODING_RELEASE_STORE_PASSWORD")
+              keyAlias System.getenv("GEOENCODING_RELEASE_KEY_ALIAS")
+              keyPassword System.getenv("GEOENCODING_RELEASE_KEY_PASSWORD")
+            }
         }
     }
     buildTypes {
         release {
             minifyEnabled false  // Set this to true to enable Proguard
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            signingConfig signingConfigs.release
         }
     }
 }
@@ -79,4 +90,7 @@ dependencies {
     compile project(':react-native-sqlite-storage')
     compile project(':react-native-code-push')
     compile project(':react-native-splashscreen')
+    compile project(':react-native-fs')
+    compile project(':RCTVideo')
+    compile project(':react-native-vector-icons')
 }
